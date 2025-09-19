@@ -1,7 +1,7 @@
 const { Pool } = require("pg");
 
 const pool = new Pool({
-  connectionString: "postgres://Raphael:898123@localhost:5432/node_postgres",
+  connectionString: "postgres://USERNAME:PASSWORD@localhost:5432/DB_NAME",
 });
 
 async function query(queryString, params, callback) {
