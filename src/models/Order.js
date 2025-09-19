@@ -10,8 +10,6 @@ class Order {
     this.createdAt = new Date(orderRow.created_at);
     this.updatedAt = new Date(orderRow.updated_at);
     
-    // dessa vez nosso construtor incluirá a possibilidade de
-    // popular propriedades com dados das tabelas associadas
     this.customer = undefined;
     if (populateCustomer) {
       this.customer = populateCustomer;
@@ -22,7 +20,6 @@ class Order {
     }
   }
 
-	// no método findAll() incluiremos os dados do cliente no pedido
   static async findAll() {
     const result = await query(
       `SELECT
@@ -53,13 +50,11 @@ class Order {
    * @param {{ id: number, quantity: number }[]} orderProducts 
    */
   static async create(customerId, orderProducts) {
-  // começamos obtendo os dados de todos os produtos desse pedido
   const storedOrderProducts = await query(
     `SELECT * FROM products WHERE id = ANY($1::int[]);`,
     [orderProducts.map(product => product.id)]
   );
   
-  // fazemos a soma do total de cada produto * sua quantidade
   let orderTotal = 0;
   const populatedOrderProducts = storedOrderProducts.rows.map((row) => {
     const { quantity } = orderProducts.find((product) => product.id === row.id);
@@ -67,14 +62,11 @@ class Order {
     return { product: new Product(row), quantity };
   });
 
-  // precisamos obter um cliente específico da pool para
-  // executar todas as queries da transaction nele
   const dbClient = await getClient();
   let response;
   try {
     await dbClient.query("BEGIN");
 
-    // inserimos o pedido
     const orderCreationResult = await dbClient.query(
       `INSERT INTO orders (customer_id, total) VALUES ($1, $2) RETURNING *;`,
       [customerId, orderTotal]
@@ -82,21 +74,18 @@ class Order {
 
     const order = new Order(orderCreationResult.rows[0], null, populatedOrderProducts);
 
-    // e então salvamos cada produto desse pedido com sua quantidade
     for (const entry of populatedOrderProducts) {
       await dbClient.query(
         `INSERT INTO order_products (order_id, product_id, quantity) VALUES ($1, $2, $3);`,
         [order.id, entry.product.id, entry.quantity]
       );
 
-      // Atualiza o estoque do produto, subtraindo a quantidade
       await dbClient.query(
         `UPDATE products SET stock_quantity = stock_quantity - $1 WHERE id = $2;`,
         [entry.quantity, entry.product.id]
       );
     }
 
-    // e então fazemos o commit da transaction
     await dbClient.query("COMMIT");
     response = order;
   } catch (error) {
@@ -109,7 +98,6 @@ class Order {
   return response;
 }
 
-	// no método findById() incluiremos os dados do cliente e a lista dos produtos
   static async findById(id) {
     const orderResult = await query(
       `SELECT
